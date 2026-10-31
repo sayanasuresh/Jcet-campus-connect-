@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JCET Campus Connect - Jawaharlal College of Engineering and Technology</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet.js CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+    
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+        }
+
+        /* Marker Styling */
+        .custom-map-marker {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+            transition: all 0.25s ease-in-out;
+            cursor: pointer;
+        }
+        
+        .custom-map-marker:hover {
+            transform: scale(1.22);
+            z-index: 1000 !important;
+        }
+
+        .marker-pulse {
+            animation: pulse-ring 1.6s infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+            70% { box-shadow: 0 0 0 16px rgba(220, 38, 38, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        }
+
+        /* Leaflet popup customization */
+        .leaflet-popup-content-wrapper {
+            padding: 0;
+            overflow: hidden;
+            border-radius: 14px;
+            box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.18);
+        }
+        .leaflet-popup-content {
+            margin: 0 !important;
+            width: 290px !important;
+        }
+        .leaflet-popup-tip {
+            background: white;
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 h-screen w-screen flex flex-col antialiased">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-slate-900 text-white h-16 flex items-center justify-between px-3 md:px-6 shadow-md z-20 shrink-0">
+        <div class="flex items-center space-x-3">
+            <div class="bg-amber-500 p-2 rounded-lg text-slate-900 font-extrabold flex items-center justify-center shadow-inner">
+                <i class="fa-solid fa-graduation-cap text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-base md:text-lg leading-tight flex items-center gap-2">
+                    JCET Campus Connect
+                    <span class="text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full">Lakkidi, Ottapalam</span>
+                </h1>
+                <p class="text-[11px] text-slate-400 hidden sm:block">Jawaharlal College of Engineering and Technology Spatial Portal</p>
+            </div>
+        </div>
+
+        <!-- Header Actions: Role Switcher & SOS Emergency -->
+        <div class="flex items-center space-x-2 md:space-x-3">
+            <!-- Global Hotline Quick Trigger -->
+            <button onclick="triggerEmergencyModal()" class="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 shadow-sm transition animate-pulse">
+                <i class="fa-solid fa-phone-flip"></i>
+                <span class="hidden sm:inline">JCET Helpline</span>
+            </button>
+
+            <!-- Role Switcher (Student vs Admin) -->
+            <div class="bg-slate-800 p-1 rounded-lg border border-slate-700 flex items-center text-xs">
+                <button id="role-student-btn" onclick="switchRole('student')" class="px-2.5 py-1 rounded-md font-medium text-white bg-indigo-600 transition">
+                    <i class="fa-solid fa-user-graduate mr-1"></i> Student
+                </button>
+                <button id="role-admin-btn" onclick="switchRole('admin')" class="px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-user-shield mr-1"></i> Admin
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+
+        <!-- Sidebar Panel -->
+        <aside id="sidebar" class="w-full md:w-96 bg-white border-r border-slate-200 flex flex-col h-1/2 md:h-full z-10 shadow-lg transition-all duration-300">
+            
+            <!-- Tab Controls -->
+            <div class="flex border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+                <button onclick="setActiveTab('explore')" id="tab-explore" class="flex-1 py-3 px-2 text-center border-b-2 border-indigo-600 text-indigo-600 font-bold flex items-center justify-center gap-1.5 transition">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                    <span>Campus Spots</span>
+                </button>
+                <button onclick="setActiveTab('events')" id="tab-events" class="flex-1 py-3 px-2 text-center border-b-2 border-transparent hover:text-slate-900 flex items-center justify-center gap-1.5 transition">
+                    <i class="fa-solid fa-calendar-star"></i>
+                    <span>JCET Events</span>
+                    <span id="event-count-badge" class="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded-full font-bold">4</span>
+                </button>
+                <button onclick="setActiveTab('admin')" id="tab-admin" class="flex-1 py-3 px-2 text-center border-b-2 border-transparent hover:text-slate-900 flex items-center justify-center gap-1.5 transition hidden">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>Spatial Admin</span>
+                </button>
+            </div>
+
+            <!-- TAB 1: EXPLORE SPOTS -->
+            <div id="panel-explore" class="flex-1 flex flex-col overflow-hidden p-4 space-y-3">
+                <!-- Search Box -->
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+                    <input type="text" id="search-input" onkeyup="handleSearch()" placeholder="Search Hangar, CSE Lab, Library, Canteen..." 
+                           class="w-full pl-8 pr-8 py-2 text-xs bg-slate-100 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition">
+                    <button onclick="clearSearch()" id="clear-search-btn" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 hidden">
+                        <i class="fa-solid fa-circle-xmark text-xs"></i>
+                    </button>
+                </div>
+
+                <!-- Category Pills -->
+                <div>
+                    <label class="text-[10px] font-bold uppercase text-slate-400 tracking-wider block mb-1.5">Filter Facilities</label>
+                    <div class="flex flex-wrap gap-1" id="category-filters">
+                        <button onclick="filterCategory('All')" class="cat-btn active border px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-white border-slate-800 transition">All</button>
+                        <button onclick="filterCategory('Academic')" class="cat-btn border px-2.5 py-1 rounded-full text-xs font-medium bg-white text-slate-700 border-slate-300 hover:bg-slate-100 transition">Academic</button>
+                        <button onclick="filterCategory('Hostel')" class="cat-btn border px-2.5 py-1 rounded-full text-xs font-medium bg-white text-slate-700 border-slate-300 hover:bg-slate-100 transition">Hostels</button>
+                        <button onclick="filterCategory('Facilities')" class="cat-btn border px-2.5 py-1 rounded-full text-xs font-medium bg-white text-slate-700 border-slate-300 hover:bg-slate-100 transition">Facilities</button>
+                        <button onclick="filterCategory('Sports')" class="cat-btn border px-2.5 py-1 rounded-full text-xs font-medium bg-white text-slate-700 border-slate-300 hover:bg-slate-100 transition">Sports</button>
+                        <button onclick="filterCategory('Emergency')" class="cat-btn border px-2.5 py-1 rounded-full text-xs font-medium bg-white text-slate-700 border-slate-300 hover:bg-slate-100 transition">Emergency</button>
+                    </div>
+                </div>
+
+                <!-- Location List -->
+                <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="location-list">
+                    <!-- Dynamic List Injected Here -->
+                </div>
+            </div>
+
+            <!-- TAB 2: JCET EVENTS SYSTEM -->
+            <div id="panel-events" class="flex-1 flex flex-col overflow-hidden p-4 space-y-3 hidden">
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 flex items-start space-x-2">
+                    <i class="fa-solid fa-circle-info text-amber-600 mt-0.5"></i>
+                    <span>Click <strong>"Focus on Map"</strong> to jump directly to the hosting building inside the JCET campus layout.</span>
+                </div>
+                <div class="flex-1 overflow-y-auto space-y-3 pr-1" id="events-list">
+                    <!-- Dynamic Events Injected Here -->
+                </div>
+            </div>
+
+            <!-- TAB 3: ADMIN CRUD PANEL -->
+            <div id="panel-admin" class="flex-1 flex flex-col overflow-hidden p-4 space-y-3 hidden">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-slate-800 text-xs uppercase tracking-wider">Spatial Data Controls</h3>
+                    <button onclick="openAddLocationModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-sm transition">
+                        <i class="fa-solid fa-plus"></i> Add Spot
+                    </button>
+                </div>
+                
+                <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-2.5 text-xs text-indigo-900">
+                    <i class="fa-solid fa-shield-halved text-indigo-600 mr-1"></i>
+                    Admin Mode: Update GPS coordinates, facility working hours, and departmental metadata.
+                </div>
+
+                <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="admin-location-list">
+                    <!-- Admin Items Injected Here -->
+                </div>
+            </div>
+
+            <!-- Recenter & Info Bar -->
+            <div class="p-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+                <span class="truncate">Jawahar Gardens, Lakkidi</span>
+                <button onclick="recenterMap()" class="text-indigo-600 font-semibold hover:underline flex items-center gap-1 shrink-0">
+                    <i class="fa-solid fa-crosshairs"></i> Recenter
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Map Viewport -->
+        <main class="flex-1 h-1/2 md:h-full relative bg-slate-200">
+            <div id="map"></div>
+
+            <!-- Floating Spatial Badge -->
+            <div class="absolute bottom-4 right-4 z-[500] bg-white/90 backdrop-blur-md px-3 py-2 rounded-xl shadow-lg border border-slate-200 text-xs font-medium text-slate-700 flex items-center gap-3">
+                <div class="flex items-center gap-1.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-ping"></span>
+                    <span>Active Locations: <strong id="active-count-display">0</strong></span>
+                </div>
+                <div class="h-3 w-px bg-slate-300"></div>
+                <span class="text-slate-400">Palakkad, Kerala</span>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL 1: ADD / EDIT LOCATION (ADMIN) -->
+    <div id="location-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden transform transition-all">
+            <div class="bg-slate-900 text-white px-5 py-3.5 flex justify-between items-center">
+                <h3 id="modal-title" class="font-bold text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-map-pin text-amber-400"></i> Add JCET Facility
+                </h3>
+                <button onclick="closeLocationModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <form id="location-form" onsubmit="handleSaveLocation(event)" class="p-4 space-y-3">
+                <input type="hidden" id="form-id">
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Building/Facility Name *</label>
+                    <input type="text" id="form-name" required placeholder="e.g. Electrical Engineering Block" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Category *</label>
+                        <select id="form-category" required class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="Academic">Academic</option>
+                            <option value="Hostel">Hostel</option>
+                            <option value="Facilities">Facilities</option>
+                            <option value="Sports">Sports</option>
+                            <option value="Emergency">Emergency</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Working Hours</label>
+                        <input type="text" id="form-hours" placeholder="09:00 AM - 04:30 PM" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Latitude *</label>
+                        <input type="number" step="any" id="form-lat" required placeholder="10.7682" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Longitude *</label>
+                        <input type="number" step="any" id="form-lng" required placeholder="76.4385" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="bg-indigo-50 p-2 rounded-lg border border-indigo-100 flex items-center justify-between text-xs text-indigo-700">
+                    <span>Set position by clicking on map:</span>
+                    <button type="button" onclick="enableMapPicker()" class="bg-indigo-600 text-white px-2 py-1 rounded font-medium hover:bg-indigo-700 text-[11px]">Pick Pin</button>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Description & Key Features</label>
+                    <textarea id="form-desc" rows="2" placeholder="Departments housed, labs, equipment..." class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+                </div>
+
+                <div class="pt-2 flex items-center justify-end space-x-2">
+                    <button type="button" onclick="closeLocationModal()" class="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-3 py-1.5 text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm">Save Building Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: EMERGENCY SOS DESK -->
+    <div id="emergency-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            <div class="bg-red-600 text-white px-5 py-4 flex justify-between items-center">
+                <h3 class="font-bold text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-phone-volume"></i> JCET Emergency Safety Contacts
+                </h3>
+                <button onclick="closeEmergencyModal()" class="text-red-200 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="p-5 space-y-3">
+                <div class="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-red-600 tracking-wider">Official Hotline</span>
+                        <h4 class="font-bold text-slate-800 text-sm">JCET Main Help Desk</h4>
+                        <p class="text-xs text-slate-500">+91 9605771555 / 0466 2230700</p>
+                    </div>
+                    <a href="tel:+919605771555" class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow flex items-center gap-1">
+                        <i class="fa-solid fa-phone"></i> Call Now
+                    </a>
+                </div>
+
+                <div class="space-y-2" id="emergency-contacts-list">
+                    <!-- Dynamic Emergency Items -->
+                </div>
+
+                <button onclick="closeEmergencyModal()" class="w-full py-2 bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-200">
+                    Close Desk
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT LOGIC -->
+    <script>
+        /**
+         * JAWAHARLAL COLLEGE OF ENGINEERING AND TECHNOLOGY (JCET)
+         * Jawahar Gardens, Lakkidi, Ottapalam, Palakkad, Kerala
+         */
+        const JCET_CENTER = [10.7682, 76.4385];
+        
+        let locations = [
+            {
+                id: "jcet-1",
+                name: "Main Academic Block",
+                category: "Academic",
+                lat: 10.7685,
+                lng: 76.4383,
+                hours: "08:30 AM - 04:30 PM",
+                description: "Primary academic building housing CSE, ECE, EEE Departments, Smart Classrooms, Dean's Office, and Computer Labs.",
+                icon: "fa-building-columns"
+            },
+            {
+                id: "jcet-2",
+                name: "Aeronautical Block & Hangar",
+                category: "Academic",
+                lat: 10.7689,
+                lng: 76.4378,
+                hours: "09:00 AM - 04:30 PM",
+                description: "State-of-the-art Aeronautical Lab equipped with a real Learjet 25b aircraft, Cessna 152, jet engines, and wind tunnel testing facilities.",
+                icon: "fa-plane"
+            },
+            {
+                id: "jcet-3",
+                name: "Mechanical & Civil Engineering Workshops",
+                category: "Academic",
+                lat: 10.7678,
+                lng: 76.4375,
+                hours: "09:00 AM - 04:30 PM",
+                description: "Heavy machinery lab, CNC machine shop, foundry, surveying lab, strength of materials testing center, and hydraulics section.",
+                icon: "fa-gears"
+            },
+            {
+                id: "jcet-4",
+                name: "JCET Central Library & Digital Archive",
+                category: "Academic",
+                lat: 10.7684,
+                lng: 76.4388,
+                hours: "08:30 AM - 06:00 PM",
+                description: "Fully automated digital library with IEEE / Springer subscriptions, 30,000+ volumes, quiet study spaces, and research archives.",
+                icon: "fa-book-bookmark"
+            },
+            {
+                id: "jcet-5",
+                name: "Main Auditorium & Conference Complex",
+                category: "Facilities",
+                lat: 10.7691,
+                lng: 76.4389,
+                hours: "09:00 AM - 05:00 PM",
+                description: "Air-conditioned multi-purpose auditorium with 800+ seating capacity, dolby acoustics, stage lighting, and seminar halls.",
+                icon: "fa-masks-theater"
+            },
+            {
+                id: "jcet-6",
+                name: "IEDC & IoT Tech Incubation Center",
+                category: "Academic",
+                lat: 10.7682,
+                lng: 76.4392,
+                hours: "09:00 AM - 05:00 PM",
+                description: "Innovation & Entrepreneurship Development Centre (IEDC), Startup Sandbox, IoT prototyping lab, and 3D printing workstation.",
+                icon: "fa-microchip"
+            },
+            {
+                id: "jcet-7",
+                name: "Central Campus Canteen & Cafeteria",
+                category: "Facilities",
+                lat: 10.7675,
+                lng: 76.4382,
+                hours: "07:30 AM - 06:00 PM",
+                description: "Spacious multi-cuisine dining hall serving fresh meals, snacks, coffee shop, and outdoor shaded student seating.",
+                icon: "fa-utensils"
+            },
+            {
+                id: "jcet-8",
+                name: "Boys Residence Hall (Hostel)",
+                category: "Hostel",
+                lat: 10.7668,
+                lng: 76.4390,
+                hours: "24/7 Residential",
+                description: "On-campus boys hostel facility with Wi-Fi Connectivity, recreation room, mess hall, and 24-hour security supervision.",
+                icon: "fa-hotel"
+            },
+            {
+                id: "jcet-9",
+                name: "Girls Residence Hall (Hostel)",
+                category: "Hostel",
+                lat: 10.7671,
+                lng: 76.4398,
+                hours: "24/7 Residential",
+                description: "Secure, comfortable living space for female students featuring resident warden desk, study rooms, and dining facilities.",
+                icon: "fa-building-user"
+            },
+            {
+                id: "jcet-10",
+                name: "Sports Complex & Athletic Ground",
+                category: "Sports",
+                lat: 10.7695,
+                lng: 76.4380,
+                hours: "06:00 AM - 07:00 PM",
+                description: "Standard cricket ground, football pitch, outdoor basketball court, badminton courts, and fitness gymnasium.",
+                icon: "fa-volleyball"
+            },
+            {
+                id: "jcet-11",
+                name: "Campus Medical Desk & First Aid Post",
+                category: "Emergency",
+                lat: 10.7680,
+                lng: 76.4380,
+                hours: "24/7 First Aid",
+                description: "Resident nursing staff, emergency first-aid kit, triage bed, and immediate transfer linkage to nearby hospitals in Ottapalam.",
+                icon: "fa-kit-medical"
+            }
+        ];
+
+        let campusEvents = [
+            {
+                id: "evt-1",
+                title: "IEEE Tech Expo 2026",
+                locationId: "jcet-5",
+                time: "Tomorrow, 09:30 AM",
+                organizer: "IEEE Student Branch JCET",
+                badge: "State Level Expo"
+            },
+            {
+                id: "evt-2",
+                title: "IoT & Embedded Systems Hands-on Workshop",
+                locationId: "jcet-6",
+                time: "Friday, 10:00 AM",
+                organizer: "IEDC Cell JCET",
+                badge: "Workshop"
+            },
+            {
+                id: "evt-3",
+                title: "Aero Dynamics & Flight Mechanics Live Demo",
+                locationId: "jcet-2",
+                time: "Saturday, 11:00 AM",
+                organizer: "Dept of Aeronautical Engg",
+                badge: "Live Flight Demo"
+            },
+            {
+                id: "evt-4",
+                title: "Hackathon & Data Structures Code Fest",
+                locationId: "jcet-1",
+                time: "Next Monday, 09:00 AM",
+                organizer: "Computer Science Association",
+                badge: "Coding Fest"
+            }
+        ];
+
+        let map;
+        let markersGroup;
+        let activeRole = 'student';
+        let activeCategoryFilter = 'All';
+        let isPickingOnMap = false;
+
+        const categoryConfig = {
+            'Academic': { color: 'bg-indigo-600', hex: '#4f46e5', icon: 'fa-graduation-cap' },
+            'Hostel': { color: 'bg-emerald-600', hex: '#059669', icon: 'fa-hotel' },
+            'Facilities': { color: 'bg-amber-500', hex: '#d97706', icon: 'fa-utensils' },
+            'Sports': { color: 'bg-sky-600', hex: '#0284c7', icon: 'fa-trophy' },
+            'Emergency': { color: 'bg-red-600', hex: '#dc2626', icon: 'fa-kit-medical' }
+        };
+
+        window.onload = function() {
+            initMap();
+            renderLocationList();
+            renderEventsList();
+            renderEmergencyContacts();
+            renderAdminLocationList();
+        };
+
+        function initMap() {
+            // Leaflet map setup centered at JCET Campus, Lakkidi
+            map = L.map('map', {
+                zoomControl: false
+            }).setView(JCET_CENTER, 17);
+
+            // OpenStreetMap tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; JCET Campus Navigation | OpenStreetMap'
+            }).addTo(map);
+
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            markersGroup = L.layerGroup().addTo(map);
+
+            map.on('click', function(e) {
+                if (isPickingOnMap) {
+                    document.getElementById('form-lat').value = e.latlng.lat.toFixed(6);
+                    document.getElementById('form-lng').value = e.latlng.lng.toFixed(6);
+                    isPickingOnMap = false;
+                    showToast("Coordinates grabbed from map location!");
+                }
+            });
+
+            refreshMapMarkers();
+        }
+
+        function refreshMapMarkers() {
+            markersGroup.clearLayers();
+
+            const filteredLocations = locations.filter(loc => {
+                return (activeCategoryFilter === 'All' || loc.category === activeCategoryFilter);
+            });
+
+            document.getElementById('active-count-display').innerText = filteredLocations.length;
+
+            filteredLocations.forEach(loc => {
+                const config = categoryConfig[loc.category] || { hex: '#4f46e5', icon: 'fa-map-pin' };
+
+                const customIcon = L.divIcon({
+                    className: 'custom-icon-wrapper',
+                    html: `
+                        <div class="custom-map-marker ${loc.category === 'Emergency' ? 'marker-pulse' : ''}" 
+                             style="background-color: ${config.hex}; width: 34px; height: 34px; border: 2px solid white;">
+                            <i class="fa-solid ${loc.icon || config.icon} text-xs"></i>
+                        </div>
+                    `,
+                    iconSize: [34, 34],
+                    iconAnchor: [17, 17],
+                    popupAnchor: [0, -18]
+                });
+
+                const marker = L.marker([loc.lat, loc.lng], { icon: customIcon });
+
+                const popupContent = `
+                    <div class="font-sans">
+                        <div class="px-3.5 py-2.5 text-white" style="background-color: ${config.hex};">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-[9px] uppercase font-extrabold tracking-wider px-2 py-0.5 rounded bg-white/20">
+                                    ${loc.category}
+                                </span>
+                                <span class="text-[11px] opacity-90"><i class="fa-regular fa-clock mr-1"></i>${loc.hours || 'N/A'}</span>
+                            </div>
+                            <h4 class="font-bold text-xs mt-1 leading-snug">${loc.name}</h4>
+                        </div>
+                        <div class="p-3 bg-white text-xs text-slate-600 space-y-2">
+                            <p class="leading-relaxed">${loc.description}</p>
+                            <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+                                <span><i class="fa-solid fa-location-dot text-indigo-500 mr-1"></i>JCET Campus</span>
+                                <button onclick="recenterMapTo(${loc.lat}, ${loc.lng})" class="text-indigo-600 font-bold hover:underline">Focus Spot</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                marker.id = loc.id;
+                markersGroup.addLayer(marker);
+            });
+        }
+
+        function renderLocationList(searchQuery = '') {
+            const listContainer = document.getElementById('location-list');
+            listContainer.innerHTML = '';
+
+            const filtered = locations.filter(loc => {
+                const matchesCat = (activeCategoryFilter === 'All' || loc.category === activeCategoryFilter);
+                const matchesSearch = loc.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                      loc.description.toLowerCase().includes(searchQuery.toLowerCase());
+                return matchesCat && matchesSearch;
+            });
+
+            if (filtered.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="text-center py-8 text-slate-400 text-xs">
+                        <i class="fa-solid fa-compass text-2xl mb-1 text-slate-300"></i>
+                        <p>No matching campus spot found.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            filtered.forEach(loc => {
+                const config = categoryConfig[loc.category] || { color: 'bg-indigo-600', icon: 'fa-map-pin' };
+                
+                const card = document.createElement('div');
+                card.className = "bg-white border border-slate-200 hover:border-indigo-400 p-2.5 rounded-xl shadow-sm hover:shadow transition cursor-pointer flex items-start space-x-2.5";
+                card.onclick = () => focusLocationOnMap(loc.id, loc.lat, loc.lng);
+
+                card.innerHTML = `
+                    <div class="${config.color} text-white p-2 rounded-lg shrink-0 flex items-center justify-center mt-0.5">
+                        <i class="fa-solid ${loc.icon || config.icon} text-xs"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between">
+                            <h4 class="font-bold text-slate-800 text-xs truncate">${loc.name}</h4>
+                            <span class="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium shrink-0 ml-1">${loc.category}</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 line-clamp-1 mt-0.5">${loc.description}</p>
+                        <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                            <i class="fa-regular fa-clock"></i>
+                            <span>${loc.hours}</span>
+                        </div>
+                    </div>
+                `;
+                listContainer.appendChild(card);
+            });
+        }
+
+        function renderEventsList() {
+            const eventsContainer = document.getElementById('events-list');
+            eventsContainer.innerHTML = '';
+
+            document.getElementById('event-count-badge').innerText = campusEvents.length;
+
+            campusEvents.forEach(evt => {
+                const targetLoc = locations.find(l => l.id === evt.locationId);
+                const venueName = targetLoc ? targetLoc.name : "JCET Building";
+
+                const card = document.createElement('div');
+                card.className = "bg-white border border-slate-200 p-3 rounded-xl shadow-sm hover:shadow-md transition space-y-2";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="text-[9px] font-extrabold uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">${evt.badge}</span>
+                        <span class="text-[11px] text-slate-500 font-medium"><i class="fa-regular fa-calendar mr-1"></i>${evt.time}</span>
+                    </div>
+                    <h4 class="font-bold text-slate-800 text-xs leading-snug">${evt.title}</h4>
+                    <div class="text-xs text-slate-600 flex items-center gap-1.5">
+                        <i class="fa-solid fa-location-dot text-amber-500"></i>
+                        <span class="font-semibold text-slate-700 truncate">${venueName}</span>
+                    </div>
+                    <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                        <span class="text-[10px] text-slate-400">${evt.organizer}</span>
+                        <button onclick="locateEventVenue('${evt.locationId}')" 
+                                class="bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white text-[11px] font-bold px-2.5 py-1 rounded-lg transition flex items-center gap-1">
+                            <i class="fa-solid fa-crosshairs"></i> Focus on Map
+                        </button>
+                    </div>
+                `;
+                eventsContainer.appendChild(card);
+            });
+        }
+
+        function renderAdminLocationList() {
+            const adminContainer = document.getElementById('admin-location-list');
+            adminContainer.innerHTML = '';
+
+            locations.forEach(loc => {
+                const card = document.createElement('div');
+                card.className = "bg-white border border-slate-200 p-2.5 rounded-xl flex items-center justify-between text-xs space-x-2";
+                card.innerHTML = `
+                    <div class="min-w-0 flex-1">
+                        <h5 class="font-bold text-slate-800 truncate">${loc.name}</h5>
+                        <div class="text-[10px] text-slate-400 flex items-center gap-1.5">
+                            <span class="bg-slate-100 px-1 rounded">${loc.category}</span>
+                            <span>[${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}]</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-1 shrink-0">
+                        <button onclick="editLocation('${loc.id}')" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteLocation('${loc.id}')" class="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                `;
+                adminContainer.appendChild(card);
+            });
+        }
+
+        function renderEmergencyContacts() {
+            const emergencyList = [
+                { name: "Campus Security Main Gate", phone: "+91 9605771555", location: "Lakkidi Entrance", icon: "fa-shield-halved" },
+                { name: "Health Center & First Aid Desk", phone: "+91 0466 2230700", location: "Near Admin Block", icon: "fa-kit-medical" },
+                { name: "Student Welfare & Hostel Security", phone: "+91 9605771556", location: "Hostel Quad", icon: "fa-user-shield" }
+            ];
+
+            const container = document.getElementById('emergency-contacts-list');
+            container.innerHTML = '';
+
+            emergencyList.forEach(item => {
+                const div = document.createElement('div');
+                div.className = "bg-slate-50 border border-slate-200 p-2.5 rounded-xl flex items-center justify-between";
+                div.innerHTML = `
+                    <div class="flex items-center space-x-2.5">
+                        <div class="bg-red-600 text-white p-2 rounded-lg text-xs">
+                            <i class="fa-solid ${item.icon}"></i>
+                        </div>
+                        <div>
+                            <h5 class="font-bold text-xs text-slate-800">${item.name}</h5>
+                            <p class="text-[10px] text-slate-500">${item.location}</p>
+                        </div>
+                    </div>
+                    <a href="tel:${item.phone}" class="bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-lg shadow flex items-center gap-1">
+                        <i class="fa-solid fa-phone"></i> Call
+                    </a>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function locateEventVenue(locationId) {
+            const target = locations.find(l => l.id === locationId);
+            if (target) {
+                focusLocationOnMap(target.id, target.lat, target.lng);
+            } else {
+                showToast("Building coordinates missing.");
+            }
+        }
+
+        function focusLocationOnMap(id, lat, lng) {
+            map.flyTo([lat, lng], 18, { duration: 1.2 });
+
+            markersGroup.eachLayer(layer => {
+                if (layer.id === id) {
+                    setTimeout(() => {
+                        layer.openPopup();
+                    }, 1200);
+                }
+            });
+        }
+
+        function filterCategory(category) {
+            activeCategoryFilter = category;
+
+            const buttons = document.querySelectorAll('.cat-btn');
+            buttons.forEach(btn => {
+                if (btn.innerText.includes(category) || (category === 'All' && btn.innerText === 'All')) {
+                    btn.className = "cat-btn active border px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-white border-slate-800 transition";
+                } else {
+                    btn.className = "cat-btn border px-2.5 py-1 rounded-full text-xs font-medium bg-white text-slate-700 border-slate-300 hover:bg-slate-100 transition";
+                }
+            });
+
+            refreshMapMarkers();
+            renderLocationList();
+        }
+
+        function handleSearch() {
+            const query = document.getElementById('search-input').value;
+            const clearBtn = document.getElementById('clear-search-btn');
+            
+            if (query.length > 0) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
+
+            renderLocationList(query);
+        }
+
+        function clearSearch() {
+            document.getElementById('search-input').value = '';
+            document.getElementById('clear-search-btn').classList.add('hidden');
+            renderLocationList();
+        }
+
+        function switchRole(role) {
+            activeRole = role;
+            const studentBtn = document.getElementById('role-student-btn');
+            const adminBtn = document.getElementById('role-admin-btn');
+            const adminTab = document.getElementById('tab-admin');
+
+            if (role === 'admin') {
+                studentBtn.className = "px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-white transition";
+                adminBtn.className = "px-2.5 py-1 rounded-md font-medium text-white bg-indigo-600 transition";
+                adminTab.classList.remove('hidden');
+                setActiveTab('admin');
+                showToast("Admin mode enabled. Spatial editing unlocked.");
+            } else {
+                adminBtn.className = "px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-white transition";
+                studentBtn.className = "px-2.5 py-1 rounded-md font-medium text-white bg-indigo-600 transition";
+                adminTab.classList.add('hidden');
+                setActiveTab('explore');
+                showToast("Switched to Student/Guest mode.");
+            }
+        }
+
+        function setActiveTab(tab) {
+            document.getElementById('panel-explore').classList.add('hidden');
+            document.getElementById('panel-events').classList.add('hidden');
+            document.getElementById('panel-admin').classList.add('hidden');
+
+            document.getElementById('tab-explore').className = "flex-1 py-3 px-2 text-center border-b-2 border-transparent text-slate-600 font-medium hover:text-slate-900 transition";
+            document.getElementById('tab-events').className = "flex-1 py-3 px-2 text-center border-b-2 border-transparent text-slate-600 font-medium hover:text-slate-900 transition";
+            document.getElementById('tab-admin').className = "flex-1 py-3 px-2 text-center border-b-2 border-transparent text-slate-600 font-medium hover:text-slate-900 transition";
+
+            if (tab === 'explore') {
+                document.getElementById('panel-explore').classList.remove('hidden');
+                document.getElementById('tab-explore').className = "flex-1 py-3 px-2 text-center border-b-2 border-indigo-600 text-indigo-600 font-bold transition";
+            } else if (tab === 'events') {
+                document.getElementById('panel-events').classList.remove('hidden');
+                document.getElementById('tab-events').className = "flex-1 py-3 px-2 text-center border-b-2 border-indigo-600 text-indigo-600 font-bold transition";
+            } else if (tab === 'admin') {
+                document.getElementById('panel-admin').classList.remove('hidden');
+                document.getElementById('tab-admin').className = "flex-1 py-3 px-2 text-center border-b-2 border-indigo-600 text-indigo-600 font-bold transition";
+            }
+        }
+
+        function openAddLocationModal() {
+            document.getElementById('modal-title').innerText = "Add JCET Facility";
+            document.getElementById('location-form').reset();
+            document.getElementById('form-id').value = '';
+            document.getElementById('location-modal').classList.remove('hidden');
+        }
+
+        function closeLocationModal() {
+            document.getElementById('location-modal').classList.add('hidden');
+        }
+
+        function enableMapPicker() {
+            isPickingOnMap = true;
+            closeLocationModal();
+            showToast("Click on map to pick coordinate pin!");
+        }
+
+        function handleSaveLocation(e) {
+            e.preventDefault();
+            const id = document.getElementById('form-id').value;
+            const name = document.getElementById('form-name').value;
+            const category = document.getElementById('form-category').value;
+            const hours = document.getElementById('form-hours').value;
+            const lat = parseFloat(document.getElementById('form-lat').value);
+            const lng = parseFloat(document.getElementById('form-lng').value);
+            const description = document.getElementById('form-desc').value;
+
+            const iconMap = {
+                'Academic': 'fa-graduation-cap',
+                'Hostel': 'fa-hotel',
+                'Facilities': 'fa-utensils',
+                'Sports': 'fa-trophy',
+                'Emergency': 'fa-kit-medical'
+            };
+
+            if (id) {
+                const index = locations.findIndex(l => l.id === id);
+                if (index !== -1) {
+                    locations[index] = { id, name, category, hours, lat, lng, description, icon: iconMap[category] };
+                    showToast("Facility updated!");
+                }
+            } else {
+                const newId = 'jcet-' + (Date.now());
+                locations.push({ id: newId, name, category, hours, lat, lng, description, icon: iconMap[category] });
+                showToast("New facility added to JCET Map!");
+            }
+
+            closeLocationModal();
+            refreshMapMarkers();
+            renderLocationList();
+            renderAdminLocationList();
+            renderEventsList();
+        }
+
+        function editLocation(id) {
+            const loc = locations.find(l => l.id === id);
+            if (!loc) return;
+
+            document.getElementById('modal-title').innerText = "Edit JCET Spot";
+            document.getElementById('form-id').value = loc.id;
+            document.getElementById('form-name').value = loc.name;
+            document.getElementById('form-category').value = loc.category;
+            document.getElementById('form-hours').value = loc.hours;
+            document.getElementById('form-lat').value = loc.lat;
+            document.getElementById('form-lng').value = loc.lng;
+            document.getElementById('form-desc').value = loc.description;
+
+            document.getElementById('location-modal').classList.remove('hidden');
+        }
+
+        function deleteLocation(id) {
+            if (confirm("Remove this facility location from JCET Campus Map?")) {
+                locations = locations.filter(l => l.id !== id);
+                refreshMapMarkers();
+                renderLocationList();
+                renderAdminLocationList();
+                renderEventsList();
+                showToast("Facility removed.");
+            }
+        }
+
+        function triggerEmergencyModal() {
+            document.getElementById('emergency-modal').classList.remove('hidden');
+        }
+
+        function closeEmergencyModal() {
+            document.getElementById('emergency-modal').classList.add('hidden');
+        }
+
+        function recenterMap() {
+            map.flyTo(JCET_CENTER, 17);
+        }
+
+        function recenterMapTo(lat, lng) {
+            map.flyTo([lat, lng], 18);
+        }
+
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = "fixed top-20 right-5 z-[2000] bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-xl flex items-center space-x-2 border border-slate-700 animate-bounce";
+            toast.innerHTML = `<i class="fa-solid fa-circle-info text-amber-400"></i><span>${message}</span>`;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
